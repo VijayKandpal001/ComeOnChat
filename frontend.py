@@ -1,12 +1,5 @@
 import streamlit as st
 import requests
-from backend.graph import bot, headingbot
-from backend.memory import (
-    retrieve_threads,
-    thread_document_metadata
-)
-from backend.rag import ingest_pdf
-
 from langchain_core.messages import (
     HumanMessage,
     AIMessage,
@@ -14,7 +7,10 @@ from langchain_core.messages import (
 import uuid
 import os 
 from langsmith import traceable
+from dotenv import load_dotenv
+load_dotenv()
 
+API_URL = os.getenv("API_URL")
 os.environ['LANGCHAIN_PROJECT']='comeonchat_langsmith'
 
 # *********************************** Utility Functions ****************************************** #
@@ -33,39 +29,24 @@ def reset_chat():
 
 @traceable
 def load_conversation(thread_id):
-    state = bot.get_state(
-        config={'configurable': {'thread_id': thread_id}}
+    response = requests.get(
+        f"{API_URL}/thread/{thread_id}/messages"
     )
-    return state.values.get('messages', [])
+    return response.json()
 
 @traceable
 def generate_name(thread_id):
-    if str(thread_id) in st.session_state['thread_titles']:
-        return st.session_state['thread_titles'][str(thread_id)]
-    
-    data= bot.get_state(
-        config={'configurable':{'thread_id': thread_id}}
-    ).values.get('messages',[])
-    # state = bot.get_state({'configurable':{'thread_id':{thread_id}}})
-    # messages = state.values.get("messages", [])
-    user_data=""
-    user_data = " ".join(
-    m.content for m in data if isinstance(m, HumanMessage)
-    )[:80]
-    
-    if not user_data.strip():
-        return "New Chat"
-    prompt = f"""Generate a short conversation title (3-6 words). Conversation:{user_data}"""
-    name = headingbot.invoke(prompt)
-    st.session_state['thread_titles'][str(thread_id)]=name.heading
-    return name.heading
-
+    response = requests.get(
+        f"{API_URL}/thread/{thread_id}/title"
+    )
+    return response.json()["title"]
 
 if 'thread_titles' not in st.session_state:
     st.session_state['thread_titles']={}
    
 if 'threads_list' not in st.session_state:
-    st.session_state['threads_list']=retrieve_threads()
+    response = requests.get(f"{API_URL}/threads")
+    st.session_state["threads_list"] = response.json()["threads"]
 
 if 'message_history' not in st.session_state:
     st.session_state['message_history']=[]
@@ -82,8 +63,6 @@ thread_docs = st.session_state["ingested_docs"].setdefault(thread_key, {})
 threads = st.session_state["threads_list"][::-1]
 selected_thread = None
 
-
-
 CONFIG={
     'configurable':{
         'thread_id': str(st.session_state['thread_id'])
@@ -96,8 +75,7 @@ CONFIG={
 
 for message in st.session_state['message_history']:
     with st.chat_message(message['role']):
-        st.text(message['content'])
-
+        st.markdown(message['content'])
 
 st.sidebar.title('ComeOnChat 💬') 
 st.sidebar.markdown(f"**Thread ID:** `{thread_key}`")
@@ -122,7 +100,7 @@ if uploaded_pdf:
             data = {"thread_id": thread_key}
 
             response = requests.post(
-                "http://127.0.0.1:8000/upload-pdf",
+                f"{API_URL}/upload-pdf",
                 params={"thread_id": thread_key},
                 files={
                     "file": (
@@ -152,7 +130,7 @@ if user_input:
     with st.chat_message('assistant'):
         def ai_only_stream():
             with requests.post(
-                "http://127.0.0.1:8000/chat/stream",
+                f"{API_URL}/chat/stream",
                 json={
                     "message": user_input,
                     "thread_id": thread_key
@@ -168,7 +146,7 @@ if user_input:
     st.session_state['message_history'].append({'role':'assistant', 'content':ai_message})
 
     response = requests.get(
-        f"http://127.0.0.1:8000/thread/{thread_key}/metadata"
+        f"{API_URL}/thread/{thread_key}/metadata"
     )
 
     doc_meta = response.json()
@@ -206,29 +184,7 @@ with st.sidebar:
         thread_heading = generate_name(thread_id)
 
         if st.button(thread_heading, key=f"thread_btn_{thread_id}"):
-
-            st.session_state['thread_id'] = thread_id
-
+            st.session_state["thread_id"] = thread_id
             message_data = load_conversation(thread_id)
-
-            message_container = []
-            for message in message_data:
-
-                if isinstance(message, HumanMessage):
-                    role = "user"
-                elif isinstance(message, AIMessage):
-                    role = "assistant"
-                else:
-                    continue
-
-                message_container.append(
-                    {
-                        "role": role,
-                        "content": message.content
-                    }
-                )
-
-            st.session_state['message_history'] = message_container
-
+            st.session_state["message_history"] = message_data
             st.rerun()
-            

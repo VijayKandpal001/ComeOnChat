@@ -1,29 +1,22 @@
 from fastapi import FastAPI, UploadFile, File
 from pydantic import BaseModel
-from backend.memory import thread_document_metadata
-from backend.graph import bot
+from backend.memory import thread_document_metadata, retrieve_threads
+from backend.graph import bot, headingbot
 from backend.rag import ingest_pdf
 from langchain_core.messages import AIMessageChunk
-from langchain_core.messages import HumanMessage
+from langchain_core.messages import HumanMessage, AIMessage
 from fastapi.responses import StreamingResponse
 import json
 
 app = FastAPI(title="ComeOnChat API")
-# ----------------------------
-# Request Models
-# ----------------------------
+
 class ChatRequest(BaseModel):
     message: str
     thread_id: str
-
-
+    
 class ChatResponse(BaseModel):
     response: str
 
-
-# ----------------------------
-# Chat Endpoint (non-stream)
-# ----------------------------
 @app.post("/chat", response_model=ChatResponse)
 def chat(req: ChatRequest):
     result = bot.invoke(
@@ -53,9 +46,6 @@ def chat_stream(req: ChatRequest):
 
     return StreamingResponse(event_generator(), media_type="text/plain")
 
-# ----------------------------
-# PDF Upload Endpoint
-# ----------------------------
 @app.post("/upload-pdf")
 def upload_pdf(thread_id: str, file: UploadFile = File(...)):
     content = file.file.read()
@@ -71,9 +61,76 @@ def upload_pdf(thread_id: str, file: UploadFile = File(...)):
         "metadata": result,
     }
 
-# ----------------------------
-# Thread Metadata Endpoint
-# ----------------------------
 @app.get("/thread/{thread_id}/metadata")
 def get_metadata(thread_id: str):
     return thread_document_metadata(thread_id)
+
+@app.get("/threads")
+def get_threads():
+    return {"threads": retrieve_threads()}
+
+@app.get("/thread/{thread_id}/messages")
+def get_thread_messages(thread_id: str):
+
+    state = bot.get_state(
+        config={"configurable": {"thread_id": thread_id}}
+    )
+
+    messages = state.values.get("messages", [])
+
+    result = []
+
+    for msg in messages:
+        if isinstance(msg, HumanMessage):
+            role = "user"
+        elif isinstance(msg, AIMessage):
+            role = "assistant"
+        else:
+            continue
+
+        result.append({
+            "role": role,
+            "content": msg.content
+        })
+
+    return result
+
+@app.get("/thread/{thread_id}/title")
+def get_thread_title(thread_id: str):
+    state = bot.get_state(
+        config={"configurable": {"thread_id": thread_id}}
+    )
+    messages = state.values.get("messages", [])
+    user_text = " ".join(m.content for m in messages if isinstance(m, HumanMessage))[:80]
+    if not user_text.strip():
+        return {"title": "New Chat"}
+    prompt = (
+        f"Generate a short conversation title "
+        f"(3-6 words). Conversation:{user_text}"
+    )
+    name = headingbot.invoke(prompt)
+    return {"title": name.heading}
+
+@app.get("/thread/{thread_id}")
+def get_thread(thread_id: str):
+    state = bot.get_state(
+        config={"configurable": {"thread_id": thread_id}}
+    )
+    messages = state.values.get("messages", [])
+    result = []
+    for msg in messages:
+        if isinstance(msg, HumanMessage):
+            role = "user"
+        elif isinstance(msg, AIMessage):
+            role = "assistant"
+        else:
+            continue
+        result.append({
+            "role": role,
+            "content": msg.content
+        })
+    return {
+        "thread_id": thread_id,
+        "messages": result,
+        "metadata": thread_document_metadata(thread_id)
+    }
