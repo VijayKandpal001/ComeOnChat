@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.pyc
+venv/
+myenv/
+
+# Environment variables
+.env
+
+# SQLite databases
+*.db
+*.sqlite
+*.sqlite3
+
+# LangGraph checkpoints
+comeonchat.db
+
+# IDE files
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
