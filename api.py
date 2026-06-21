@@ -17,6 +17,11 @@ class ChatRequest(BaseModel):
 class ChatResponse(BaseModel):
     response: str
 
+@app.get("/")
+def home():
+    return {"message": "Chatbot API is running"}
+
+
 @app.post("/chat", response_model=ChatResponse)
 def chat(req: ChatRequest):
     result = bot.invoke(
