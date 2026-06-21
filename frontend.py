@@ -10,7 +10,7 @@ from langsmith import traceable
 from dotenv import load_dotenv
 load_dotenv()
 
-API_URL = os.getenv("API_URL")
+API_URL = "https://comeonchat-api.onrender.com"
 os.environ['LANGCHAIN_PROJECT']='comeonchat_langsmith'
 
 # *********************************** Utility Functions ****************************************** #
