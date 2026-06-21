@@ -7,6 +7,7 @@ from langchain_core.messages import AIMessageChunk
 from langchain_core.messages import HumanMessage, AIMessage
 from fastapi.responses import StreamingResponse
 import json
+import os
 
 app = FastAPI(title="ComeOnChat API")
 
@@ -149,3 +150,9 @@ def get_thread(thread_id: str):
         "messages": result,
         "metadata": thread_document_metadata(thread_id)
     }
+
+@app.delete("/reset-db")
+def reset_db():
+    if os.path.exists("comeonchat.db"):
+        os.remove("comeonchat.db")
+    return {"status": "Database deleted"}
