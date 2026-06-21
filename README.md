@@ -166,12 +166,20 @@ docker run -p 8501:8501 --env-file .env comeonchat-frontend
 
 ---
 
-## 📝 Notes
+## 🧰 Tech Stack
 
-- PDF ingestion is handled via `PyPDFLoader`, text splitting, and FAISS vector storage.
-- Embeddings are created with Google Generative AI via `GoogleGenerativeAIEmbeddings`.
-- The assistant may call external tools or the RAG tool depending on the query.
-- Chat history is preserved using SQLite checkpointing stored in `comeonchat.db`.
+- Python 3.12
+- FastAPI for the backend API
+- Streamlit for the frontend UI
+- LangGraph for chat graph orchestration and state management
+- LangChain and LangChain Core for LLM interaction
+- GROQ model via `langchain-groq`
+- Google Generative AI embeddings via `google-genai`/`langchain-google-genai`
+- FAISS for vector search and retrieval
+- SQLite for session checkpoint storage
+- Pydantic for request validation and structured output
+- PDF parsing via `PyPDFLoader`
+- Docker for containerized deployment
 
 ---
 
