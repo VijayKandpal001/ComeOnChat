@@ -1,6 +1,7 @@
 # Python
 __pycache__/
 *.pyc
+.venv/
 venv/
 myenv/
 
@@ -11,6 +12,8 @@ myenv/
 *.db
 *.sqlite
 *.sqlite3
+*.db-shm
+*.db-wal
 
 # LangGraph checkpoints
 comeonchat.db
@@ -21,3 +24,6 @@ comeonchat.db
 
 # OS files
 .DS_Store
+
+# Temporary files
+temp/

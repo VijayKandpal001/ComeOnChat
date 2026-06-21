@@ -1,15 +1,18 @@
 import os
-from typing import TypedDict, Annotated, Optional, Dict, Any
 import tempfile
+from typing import TypedDict, Annotated, Optional, Dict, Any
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.vectorstores import FAISS
+from langchain_google_genai import GoogleGenerativeAIEmbeddings
 from langchain.tools import tool
-from langchain_huggingface import HuggingFaceEmbeddings
-from sentence_transformers import SentenceTransformer
+from dotenv import load_dotenv
+load_dotenv()
 
-embeddings = HuggingFaceEmbeddings(
-    model_name="sentence-transformers/all-MiniLM-L6-v2"
+
+embeddings = GoogleGenerativeAIEmbeddings(
+    model="models/gemini-embedding-2",
+    google_api_key=os.getenv("GOOGLE_API_KEY")
 )
 
 _THREAD_RETRIEVERS: Dict[str, Any] = {}

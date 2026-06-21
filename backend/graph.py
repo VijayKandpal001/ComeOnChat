@@ -1,4 +1,3 @@
-from langchain_huggingface import HuggingFaceEmbeddings
 from langgraph.graph import StateGraph, START, END
 from typing import TypedDict, Annotated, Optional, Dict, Any
 from langchain_groq import ChatGroq

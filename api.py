@@ -48,18 +48,28 @@ def chat_stream(req: ChatRequest):
 
 @app.post("/upload-pdf")
 def upload_pdf(thread_id: str, file: UploadFile = File(...)):
-    content = file.file.read()
+    try:
+        content = file.file.read()
 
-    result = ingest_pdf(
-        file_bytes=content,
-        thread_id=thread_id,
-        filename=file.filename,
-    )
+        result = ingest_pdf(
+            file_bytes=content,
+            thread_id=thread_id,
+            filename=file.filename,
+        )
 
-    return {
-        "status": "success",
-        "metadata": result,
-    }
+        return {
+            "status": "success",
+            "metadata": result,
+        }
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+
+        return {
+            "status": "error",
+            "message": str(e)
+        }
 
 @app.get("/thread/{thread_id}/metadata")
 def get_metadata(thread_id: str):

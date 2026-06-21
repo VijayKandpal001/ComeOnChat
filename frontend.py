@@ -113,11 +113,12 @@ if uploaded_pdf:
 
             data = response.json()
 
-            if response.status_code == 200:
+            if response.status_code == 200 and data.get("status") == "success":
                 result = data["metadata"]
                 thread_docs[uploaded_pdf.name] = result
             else:
-                st.error(data)
+                st.error(data.get("message", "Unknown error"))
+                st.stop()
 
             status_box.update(label="✅ PDF indexed", state="complete", expanded=False)
 
