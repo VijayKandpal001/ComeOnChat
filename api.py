@@ -150,9 +150,3 @@ def get_thread(thread_id: str):
         "messages": result,
         "metadata": thread_document_metadata(thread_id)
     }
-
-@app.delete("/reset-db")
-def reset_db():
-    if os.path.exists("comeonchat.db"):
-        os.remove("comeonchat.db")
-    return {"status": "Database deleted"}
