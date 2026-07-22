@@ -34,26 +34,26 @@ def load_conversation(thread_id):
     )
     return response.json()
 
-# @traceable
-# def generate_name(thread_id):
-#     response = requests.get(
-#         f"{API_URL}/thread/{thread_id}/title"
-#     )
-#     return response.json()["title"]
-
 @traceable
 def generate_name(thread_id):
     response = requests.get(
         f"{API_URL}/thread/{thread_id}/title"
     )
-
-    print("STATUS:", response.status_code)
-    print("HEADERS:", response.headers.get("content-type"))
-    print("BODY:", response.text)
-
-    response.raise_for_status()
-
     return response.json()["title"]
+
+# @traceable
+# def generate_name(thread_id):
+#     response = requests.get(
+#         f"{API_URL}/thread/{thread_id}/title"
+#     )
+
+#     print("STATUS:", response.status_code)
+#     print("HEADERS:", response.headers.get("content-type"))
+#     print("BODY:", response.text)
+
+#     response.raise_for_status()
+
+#     return response.json()["title"]
 
 if 'thread_titles' not in st.session_state:
     st.session_state['thread_titles']={}
@@ -143,37 +143,37 @@ if user_input:
         st.text(user_input)
 
     with st.chat_message('assistant'):
-        # def ai_only_stream():
-        #     with requests.post(
-        #         f"{API_URL}/chat/stream",
-        #         json={
-        #             "message": user_input,
-        #             "thread_id": thread_key
-        #         },
-        #         stream=True
-        #     ) as response:
-
-        #         for chunk in response.iter_content(decode_unicode=True):
-        #             if chunk:
-        #                 yield chunk
         def ai_only_stream():
-            response = requests.post(
+            with requests.post(
                 f"{API_URL}/chat/stream",
                 json={
                     "message": user_input,
                     "thread_id": thread_key
                 },
                 stream=True
-            )
+            ) as response:
 
-            print("STATUS:", response.status_code)
+                for chunk in response.iter_content(decode_unicode=True):
+                    if chunk:
+                        yield chunk
+        # def ai_only_stream():
+        #     response = requests.post(
+        #         f"{API_URL}/chat/stream",
+        #         json={
+        #             "message": user_input,
+        #             "thread_id": thread_key
+        #         },
+        #         stream=True
+        #     )
 
-            for chunk in response.iter_content(
-                chunk_size=None,
-                decode_unicode=True
-            ):
-                if chunk:
-                    yield chunk
+        #     print("STATUS:", response.status_code)
+
+        #     for chunk in response.iter_content(
+        #         chunk_size=None,
+        #         decode_unicode=True
+        #     ):
+        #         if chunk:
+        #             yield chunk
         
         ai_message= st.write_stream(ai_only_stream())        
     st.session_state['message_history'].append({'role':'assistant', 'content':ai_message})
