@@ -176,40 +176,43 @@ if user_input:
         st.text(user_input)
 
     with st.chat_message('assistant'):
-        def ai_only_stream():
+        placeholder = st.empty()
+        assistant_text = ""
+
+        try:
             with requests.post(
                 f"{API_URL}/chat/stream",
-                json={
-                    "message": user_input,
-                    "thread_id": thread_key
-                },
-                stream=True
+                json={"message": user_input, "thread_id": thread_key},
+                stream=True,
+                timeout=60,
             ) as response:
+                response.raise_for_status()
 
-                for chunk in response.iter_content(decode_unicode=True):
+                # Collect and display chunks as they arrive
+                for chunk in response.iter_content(chunk_size=None, decode_unicode=True):
                     if chunk:
-                        yield chunk
-        # def ai_only_stream():
-        #     response = requests.post(
-        #         f"{API_URL}/chat/stream",
-        #         json={
-        #             "message": user_input,
-        #             "thread_id": thread_key
-        #         },
-        #         stream=True
-        #     )
+                        assistant_text += chunk
+                        placeholder.markdown(assistant_text)
 
-        #     print("STATUS:", response.status_code)
+                # If no chunks were yielded, fall back to non-streaming call
+                if not assistant_text:
+                    raise RuntimeError("No streaming chunks received")
 
-        #     for chunk in response.iter_content(
-        #         chunk_size=None,
-        #         decode_unicode=True
-        #     ):
-        #         if chunk:
-        #             yield chunk
-        
-        ai_message= st.write_stream(ai_only_stream())        
-    st.session_state['message_history'].append({'role':'assistant', 'content':ai_message})
+        except Exception:
+            # Fallback: request the full response from the non-streaming endpoint
+            try:
+                resp = requests.post(
+                    f"{API_URL}/chat",
+                    json={"message": user_input, "thread_id": thread_key},
+                    timeout=60,
+                )
+                resp.raise_for_status()
+                assistant_text = resp.json().get("response", "")
+                placeholder.markdown(assistant_text)
+            except Exception:
+                placeholder.markdown("Sorry, I couldn't get a response from the server.")
+
+    st.session_state['message_history'].append({'role':'assistant', 'content':assistant_text})
 
     try:
         response = requests.get(f"{API_URL}/thread/{thread_key}/metadata", timeout=15)
