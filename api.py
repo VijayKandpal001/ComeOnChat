@@ -45,15 +45,25 @@ def chat_stream(req: ChatRequest):
 
     def event_generator():
         try:
+            yielded = False
             for msg, metadata in bot.stream(
                 {"messages": [HumanMessage(content=req.message)]},
                 config={"configurable": {"thread_id": req.thread_id}},
                 stream_mode="messages",
             ):
                 if metadata.get("langgraph_node") == "chat_node":
-                    if isinstance(msg, AIMessageChunk):
+                    if isinstance(msg, (AIMessageChunk, AIMessage)):
                         if msg.content:
+                            yielded = True
                             yield msg.content
+            if not yielded:
+                result = bot.invoke(
+                    {"messages": [HumanMessage(content=req.message)]},
+                    config={"configurable": {"thread_id": req.thread_id}},
+                )
+                content = result["messages"][-1].content
+                if content:
+                    yield content
         except Exception as e:
             import traceback
             traceback.print_exc()
