@@ -34,11 +34,25 @@ def load_conversation(thread_id):
     )
     return response.json()
 
+# @traceable
+# def generate_name(thread_id):
+#     response = requests.get(
+#         f"{API_URL}/thread/{thread_id}/title"
+#     )
+#     return response.json()["title"]
+
 @traceable
 def generate_name(thread_id):
     response = requests.get(
         f"{API_URL}/thread/{thread_id}/title"
     )
+
+    print("STATUS:", response.status_code)
+    print("HEADERS:", response.headers.get("content-type"))
+    print("BODY:", response.text)
+
+    response.raise_for_status()
+
     return response.json()["title"]
 
 if 'thread_titles' not in st.session_state:
