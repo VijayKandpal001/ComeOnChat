@@ -27,19 +27,40 @@ def reset_chat():
         st.session_state['threads_list'].append(new_thread_id)
     st.rerun()
 
+def _parse_json_response(response):
+    try:
+        return response.json()
+    except ValueError:
+        return None
+
+
 @traceable
 def load_conversation(thread_id):
-    response = requests.get(
-        f"{API_URL}/thread/{thread_id}/messages"
-    )
-    return response.json()
+    try:
+        response = requests.get(f"{API_URL}/thread/{thread_id}/messages", timeout=15)
+        response.raise_for_status()
+        data = _parse_json_response(response)
+        if isinstance(data, list):
+            return data
+    except (requests.RequestException, ValueError):
+        pass
+
+    return []
+
 
 @traceable
 def generate_name(thread_id):
-    response = requests.get(
-        f"{API_URL}/thread/{thread_id}/title"
-    )
-    return response.json()["title"]
+    try:
+        response = requests.get(f"{API_URL}/thread/{thread_id}/title", timeout=15)
+        response.raise_for_status()
+        data = _parse_json_response(response)
+        title = data.get("title") if isinstance(data, dict) else None
+        if isinstance(title, str) and title.strip():
+            return title.strip()
+    except (requests.RequestException, ValueError):
+        pass
+
+    return "New Chat"
 
 # @traceable
 # def generate_name(thread_id):
@@ -59,8 +80,15 @@ if 'thread_titles' not in st.session_state:
     st.session_state['thread_titles']={}
    
 if 'threads_list' not in st.session_state:
-    response = requests.get(f"{API_URL}/threads")
-    st.session_state["threads_list"] = response.json()["threads"]
+    try:
+        response = requests.get(f"{API_URL}/threads", timeout=15)
+        response.raise_for_status()
+        data = _parse_json_response(response)
+        threads = data.get("threads", []) if isinstance(data, dict) else []
+    except (requests.RequestException, ValueError):
+        threads = []
+
+    st.session_state["threads_list"] = threads
 
 if 'message_history' not in st.session_state:
     st.session_state['message_history']=[]
@@ -113,25 +141,30 @@ if uploaded_pdf:
             files = {"file": uploaded_pdf}
             data = {"thread_id": thread_key}
 
-            response = requests.post(
-                f"{API_URL}/upload-pdf",
-                params={"thread_id": thread_key},
-                files={
-                    "file": (
-                        uploaded_pdf.name,
-                        uploaded_pdf.getvalue(),
-                        "application/pdf"
-                    )
-                }
-            )
+            try:
+                response = requests.post(
+                    f"{API_URL}/upload-pdf",
+                    params={"thread_id": thread_key},
+                    files={
+                        "file": (
+                            uploaded_pdf.name,
+                            uploaded_pdf.getvalue(),
+                            "application/pdf"
+                        )
+                    },
+                    timeout=60,
+                )
+                response.raise_for_status()
+                data = _parse_json_response(response)
+            except (requests.RequestException, ValueError):
+                data = None
 
-            data = response.json()
-
-            if response.status_code == 200 and data.get("status") == "success":
+            if isinstance(data, dict) and response.status_code == 200 and data.get("status") == "success":
                 result = data["metadata"]
                 thread_docs[uploaded_pdf.name] = result
             else:
-                st.error(data.get("message", "Unknown error"))
+                message = data.get("message", "Unknown error") if isinstance(data, dict) else "The backend returned an invalid response."
+                st.error(message)
                 st.stop()
 
             status_box.update(label="✅ PDF indexed", state="complete", expanded=False)
@@ -178,11 +211,13 @@ if user_input:
         ai_message= st.write_stream(ai_only_stream())        
     st.session_state['message_history'].append({'role':'assistant', 'content':ai_message})
 
-    response = requests.get(
-        f"{API_URL}/thread/{thread_key}/metadata"
-    )
+    try:
+        response = requests.get(f"{API_URL}/thread/{thread_key}/metadata", timeout=15)
+        response.raise_for_status()
+        doc_meta = _parse_json_response(response)
+    except (requests.RequestException, ValueError):
+        doc_meta = None
 
-    doc_meta = response.json()
     if doc_meta:
         st.caption(
             f"Document indexed: {doc_meta.get('filename')} "
