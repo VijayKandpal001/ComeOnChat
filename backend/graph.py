@@ -15,8 +15,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 model= ChatGroq(
-    model= 'qwen/qwen3-32b',
-    reasoning_effort="none"
+    model= 'qwen/qwen3.6-27b',
     )
 
 
