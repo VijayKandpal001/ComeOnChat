@@ -52,28 +52,27 @@ def chat(req: ChatRequest):
 
 #     return StreamingResponse(event_generator(), media_type="text/plain")
 
-
 @app.post("/chat/stream")
 def chat_stream(req: ChatRequest):
 
     def event_generator():
-        for msg, metadata in bot.stream(
+        print("STREAM START")
+
+        result = bot.invoke(
             {"messages": [HumanMessage(content=req.message)]},
             config={"configurable": {"thread_id": req.thread_id}},
-            stream_mode="messages",
-        ):
+        )
 
-            print("MESSAGE:", msg)
-            print("METADATA:", metadata)
+        answer = result["messages"][-1].content
 
-            if hasattr(msg, "content") and msg.content:
-                yield msg.content
+        print("ANSWER:", answer)
+
+        yield answer
 
     return StreamingResponse(
         event_generator(),
         media_type="text/plain"
     )
-
 
 @app.post("/upload-pdf")
 def upload_pdf(thread_id: str, file: UploadFile = File(...)):
