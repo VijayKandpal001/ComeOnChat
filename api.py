@@ -1,3 +1,5 @@
+
+            
 from fastapi import FastAPI, UploadFile, File
 from pydantic import BaseModel
 from backend.memory import thread_document_metadata, retrieve_threads
@@ -133,51 +135,21 @@ def get_thread_messages(thread_id: str):
 
     return result
 
-def _build_fallback_title(user_text: str) -> str:
-    cleaned_words = []
-    for word in user_text.split():
-        cleaned = word.strip(".,!?;:()[]{}\"'")
-        if cleaned:
-            cleaned_words.append(cleaned)
-
-    if not cleaned_words:
-        return "New Chat"
-
-    title_words = cleaned_words[:6]
-    title = " ".join(title_words)
-    return title[:40].strip() or "New Chat"
-
-
 @app.get("/thread/{thread_id}/title")
 def get_thread_title(thread_id: str):
-    try:
-        state = bot.get_state(
-            config={"configurable": {"thread_id": thread_id}}
-        )
-        messages = state.values.get("messages", [])
-        user_text = " ".join(
-            m.content for m in messages if isinstance(m, HumanMessage)
-        )[:120]
-
-        if not user_text.strip():
-            return {"title": "New Chat"}
-
-        prompt = (
-            f"Generate a short conversation title "
-            f"(3-6 words). Conversation:{user_text}"
-        )
-
-        try:
-            name = headingbot.invoke(prompt)
-            title = getattr(name, "heading", None)
-            if isinstance(title, str) and title.strip():
-                return {"title": title.strip()}
-        except Exception:
-            pass
-
-        return {"title": _build_fallback_title(user_text)}
-    except Exception:
+    state = bot.get_state(
+        config={"configurable": {"thread_id": thread_id}}
+    )
+    messages = state.values.get("messages", [])
+    user_text = " ".join(m.content for m in messages if isinstance(m, HumanMessage))[:80]
+    if not user_text.strip():
         return {"title": "New Chat"}
+    prompt = (
+        f"Generate a short conversation title "
+        f"(3-6 words). Conversation:{user_text}"
+    )
+    name = headingbot.invoke(prompt)
+    return {"title": name.heading}
 
 # @app.get("/thread/{thread_id}/title")
 # def get_thread_title(thread_id: str):
@@ -243,4 +215,4 @@ def get_thread(thread_id: str):
         "thread_id": thread_id,
         "messages": result,
         "metadata": thread_document_metadata(thread_id)
-    }
+    }            

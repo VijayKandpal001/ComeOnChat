@@ -27,40 +27,19 @@ def reset_chat():
         st.session_state['threads_list'].append(new_thread_id)
     st.rerun()
 
-def _parse_json_response(response):
-    try:
-        return response.json()
-    except ValueError:
-        return None
-
-
 @traceable
 def load_conversation(thread_id):
-    try:
-        response = requests.get(f"{API_URL}/thread/{thread_id}/messages", timeout=15)
-        response.raise_for_status()
-        data = _parse_json_response(response)
-        if isinstance(data, list):
-            return data
-    except (requests.RequestException, ValueError):
-        pass
-
-    return []
-
+    response = requests.get(
+        f"{API_URL}/thread/{thread_id}/messages"
+    )
+    return response.json()
 
 @traceable
 def generate_name(thread_id):
-    try:
-        response = requests.get(f"{API_URL}/thread/{thread_id}/title", timeout=15)
-        response.raise_for_status()
-        data = _parse_json_response(response)
-        title = data.get("title") if isinstance(data, dict) else None
-        if isinstance(title, str) and title.strip():
-            return title.strip()
-    except (requests.RequestException, ValueError):
-        pass
-
-    return "New Chat"
+    response = requests.get(
+        f"{API_URL}/thread/{thread_id}/title"
+    )
+    return response.json()["title"]
 
 # @traceable
 # def generate_name(thread_id):
@@ -80,15 +59,8 @@ if 'thread_titles' not in st.session_state:
     st.session_state['thread_titles']={}
    
 if 'threads_list' not in st.session_state:
-    try:
-        response = requests.get(f"{API_URL}/threads", timeout=15)
-        response.raise_for_status()
-        data = _parse_json_response(response)
-        threads = data.get("threads", []) if isinstance(data, dict) else []
-    except (requests.RequestException, ValueError):
-        threads = []
-
-    st.session_state["threads_list"] = threads
+    response = requests.get(f"{API_URL}/threads")
+    st.session_state["threads_list"] = response.json()["threads"]
 
 if 'message_history' not in st.session_state:
     st.session_state['message_history']=[]
@@ -141,30 +113,25 @@ if uploaded_pdf:
             files = {"file": uploaded_pdf}
             data = {"thread_id": thread_key}
 
-            try:
-                response = requests.post(
-                    f"{API_URL}/upload-pdf",
-                    params={"thread_id": thread_key},
-                    files={
-                        "file": (
-                            uploaded_pdf.name,
-                            uploaded_pdf.getvalue(),
-                            "application/pdf"
-                        )
-                    },
-                    timeout=60,
-                )
-                response.raise_for_status()
-                data = _parse_json_response(response)
-            except (requests.RequestException, ValueError):
-                data = None
+            response = requests.post(
+                f"{API_URL}/upload-pdf",
+                params={"thread_id": thread_key},
+                files={
+                    "file": (
+                        uploaded_pdf.name,
+                        uploaded_pdf.getvalue(),
+                        "application/pdf"
+                    )
+                }
+            )
 
-            if isinstance(data, dict) and response.status_code == 200 and data.get("status") == "success":
+            data = response.json()
+
+            if response.status_code == 200 and data.get("status") == "success":
                 result = data["metadata"]
                 thread_docs[uploaded_pdf.name] = result
             else:
-                message = data.get("message", "Unknown error") if isinstance(data, dict) else "The backend returned an invalid response."
-                st.error(message)
+                st.error(data.get("message", "Unknown error"))
                 st.stop()
 
             status_box.update(label="✅ PDF indexed", state="complete", expanded=False)
@@ -176,51 +143,46 @@ if user_input:
         st.text(user_input)
 
     with st.chat_message('assistant'):
-        placeholder = st.empty()
-        assistant_text = ""
-
-        try:
+        def ai_only_stream():
             with requests.post(
                 f"{API_URL}/chat/stream",
-                json={"message": user_input, "thread_id": thread_key},
-                stream=True,
-                timeout=60,
+                json={
+                    "message": user_input,
+                    "thread_id": thread_key
+                },
+                stream=True
             ) as response:
-                response.raise_for_status()
 
-                # Collect and display chunks as they arrive
-                for chunk in response.iter_content(chunk_size=None, decode_unicode=True):
+                for chunk in response.iter_content(decode_unicode=True):
                     if chunk:
-                        assistant_text += chunk
-                        placeholder.markdown(assistant_text)
+                        yield chunk
+        # def ai_only_stream():
+        #     response = requests.post(
+        #         f"{API_URL}/chat/stream",
+        #         json={
+        #             "message": user_input,
+        #             "thread_id": thread_key
+        #         },
+        #         stream=True
+        #     )
 
-                # If no chunks were yielded, fall back to non-streaming call
-                if not assistant_text:
-                    raise RuntimeError("No streaming chunks received")
+        #     print("STATUS:", response.status_code)
 
-        except Exception:
-            # Fallback: request the full response from the non-streaming endpoint
-            try:
-                resp = requests.post(
-                    f"{API_URL}/chat",
-                    json={"message": user_input, "thread_id": thread_key},
-                    timeout=60,
-                )
-                resp.raise_for_status()
-                assistant_text = resp.json().get("response", "")
-                placeholder.markdown(assistant_text)
-            except Exception:
-                placeholder.markdown("Sorry, I couldn't get a response from the server.")
+        #     for chunk in response.iter_content(
+        #         chunk_size=None,
+        #         decode_unicode=True
+        #     ):
+        #         if chunk:
+        #             yield chunk
+        
+        ai_message= st.write_stream(ai_only_stream())        
+    st.session_state['message_history'].append({'role':'assistant', 'content':ai_message})
 
-    st.session_state['message_history'].append({'role':'assistant', 'content':assistant_text})
+    response = requests.get(
+        f"{API_URL}/thread/{thread_key}/metadata"
+    )
 
-    try:
-        response = requests.get(f"{API_URL}/thread/{thread_key}/metadata", timeout=15)
-        response.raise_for_status()
-        doc_meta = _parse_json_response(response)
-    except (requests.RequestException, ValueError):
-        doc_meta = None
-
+    doc_meta = response.json()
     if doc_meta:
         st.caption(
             f"Document indexed: {doc_meta.get('filename')} "
