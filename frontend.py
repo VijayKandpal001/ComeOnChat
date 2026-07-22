@@ -29,27 +29,17 @@ def reset_chat():
 
 @traceable
 def load_conversation(thread_id):
-    try:
-        response = requests.get(
-            f"{API_URL}/thread/{thread_id}/messages", timeout=15
-        )
-        if response.status_code == 200:
-            return response.json()
-        return []
-    except Exception:
-        return []
+    response = requests.get(
+        f"{API_URL}/thread/{thread_id}/messages"
+    )
+    return response.json()
 
 @traceable
 def generate_name(thread_id):
-    try:
-        response = requests.get(
-            f"{API_URL}/thread/{thread_id}/title", timeout=15
-        )
-        if response.status_code == 200:
-            return response.json().get("title", "New Chat")
-        return "New Chat"
-    except Exception:
-        return "New Chat"
+    response = requests.get(
+        f"{API_URL}/thread/{thread_id}/title"
+    )
+    return response.json()["title"]
 
 # @traceable
 # def generate_name(thread_id):
@@ -69,11 +59,8 @@ if 'thread_titles' not in st.session_state:
     st.session_state['thread_titles']={}
    
 if 'threads_list' not in st.session_state:
-    try:
-        response = requests.get(f"{API_URL}/threads", timeout=10)
-        st.session_state["threads_list"] = response.json().get("threads", [])
-    except Exception:
-        st.session_state["threads_list"] = []
+    response = requests.get(f"{API_URL}/threads")
+    st.session_state["threads_list"] = response.json()["threads"]
 
 if 'message_history' not in st.session_state:
     st.session_state['message_history']=[]
@@ -167,7 +154,7 @@ if user_input:
             ) as response:
 
                 for chunk in response.iter_content(decode_unicode=True):
-                    if chunk and chunk != "\n":
+                    if chunk:
                         yield chunk
         # def ai_only_stream():
         #     response = requests.post(
@@ -227,12 +214,13 @@ with st.sidebar:
         reset_chat()
     st.header('My conversations')
     for i, thread_id in enumerate(st.session_state['threads_list'][::-1]):
-        if thread_id not in st.session_state['thread_titles']:
-            st.session_state['thread_titles'][thread_id] = generate_name(thread_id)
-        thread_heading = st.session_state['thread_titles'][thread_id]
+        thread_heading = generate_name(thread_id)
 
         if st.button(thread_heading, key=f"thread_btn_{thread_id}"):
             st.session_state["thread_id"] = thread_id
             message_data = load_conversation(thread_id)
             st.session_state["message_history"] = message_data
             st.rerun()
+            
+            
+            
