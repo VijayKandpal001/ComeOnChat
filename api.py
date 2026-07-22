@@ -111,21 +111,62 @@ def get_thread_messages(thread_id: str):
 
     return result
 
+# @app.get("/thread/{thread_id}/title")
+# def get_thread_title(thread_id: str):
+#     state = bot.get_state(
+#         config={"configurable": {"thread_id": thread_id}}
+#     )
+#     messages = state.values.get("messages", [])
+#     user_text = " ".join(m.content for m in messages if isinstance(m, HumanMessage))[:80]
+#     if not user_text.strip():
+#         return {"title": "New Chat"}
+#     prompt = (
+#         f"Generate a short conversation title "
+#         f"(3-6 words). Conversation:{user_text}"
+#     )
+#     name = headingbot.invoke(prompt)
+#     return {"title": name.heading}
+
 @app.get("/thread/{thread_id}/title")
 def get_thread_title(thread_id: str):
-    state = bot.get_state(
-        config={"configurable": {"thread_id": thread_id}}
-    )
-    messages = state.values.get("messages", [])
-    user_text = " ".join(m.content for m in messages if isinstance(m, HumanMessage))[:80]
-    if not user_text.strip():
-        return {"title": "New Chat"}
-    prompt = (
-        f"Generate a short conversation title "
-        f"(3-6 words). Conversation:{user_text}"
-    )
-    name = headingbot.invoke(prompt)
-    return {"title": name.heading}
+    try:
+        state = bot.get_state(
+            config={"configurable": {"thread_id": thread_id}}
+        )
+
+        print("STATE:", state)
+
+        if state is None:
+            return {"title": "New Chat"}
+
+        messages = state.values.get("messages", [])
+        print("MESSAGES:", messages)
+
+        user_text = " ".join(
+            m.content for m in messages
+            if isinstance(m, HumanMessage)
+        )[:80]
+
+        if not user_text.strip():
+            return {"title": "New Chat"}
+
+        prompt = (
+            f"Generate a short conversation title (3-6 words). "
+            f"Conversation: {user_text}"
+        )
+
+        name = headingbot.invoke(prompt)
+
+        print("NAME TYPE:", type(name))
+        print("NAME:", name)
+
+        return {"title": name.heading}
+
+    except Exception:
+        import traceback
+        traceback.print_exc()
+        raise
+
 
 @app.get("/thread/{thread_id}")
 def get_thread(thread_id: str):
