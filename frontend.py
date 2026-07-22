@@ -29,17 +29,27 @@ def reset_chat():
 
 @traceable
 def load_conversation(thread_id):
-    response = requests.get(
-        f"{API_URL}/thread/{thread_id}/messages"
-    )
-    return response.json()
+    try:
+        response = requests.get(
+            f"{API_URL}/thread/{thread_id}/messages", timeout=15
+        )
+        if response.status_code == 200:
+            return response.json()
+        return []
+    except Exception:
+        return []
 
 @traceable
 def generate_name(thread_id):
-    response = requests.get(
-        f"{API_URL}/thread/{thread_id}/title"
-    )
-    return response.json()["title"]
+    try:
+        response = requests.get(
+            f"{API_URL}/thread/{thread_id}/title", timeout=15
+        )
+        if response.status_code == 200:
+            return response.json().get("title", "New Chat")
+        return "New Chat"
+    except Exception:
+        return "New Chat"
 
 # @traceable
 # def generate_name(thread_id):
@@ -59,8 +69,11 @@ if 'thread_titles' not in st.session_state:
     st.session_state['thread_titles']={}
    
 if 'threads_list' not in st.session_state:
-    response = requests.get(f"{API_URL}/threads")
-    st.session_state["threads_list"] = response.json()["threads"]
+    try:
+        response = requests.get(f"{API_URL}/threads", timeout=10)
+        st.session_state["threads_list"] = response.json().get("threads", [])
+    except Exception:
+        st.session_state["threads_list"] = []
 
 if 'message_history' not in st.session_state:
     st.session_state['message_history']=[]
@@ -214,7 +227,9 @@ with st.sidebar:
         reset_chat()
     st.header('My conversations')
     for i, thread_id in enumerate(st.session_state['threads_list'][::-1]):
-        thread_heading = generate_name(thread_id)
+        if thread_id not in st.session_state['thread_titles']:
+            st.session_state['thread_titles'][thread_id] = generate_name(thread_id)
+        thread_heading = st.session_state['thread_titles'][thread_id]
 
         if st.button(thread_heading, key=f"thread_btn_{thread_id}"):
             st.session_state["thread_id"] = thread_id
