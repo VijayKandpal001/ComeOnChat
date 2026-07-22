@@ -134,13 +134,10 @@ def get_thread_title(thread_id: str):
             config={"configurable": {"thread_id": thread_id}}
         )
 
-        print("STATE:", state)
-
         if state is None:
             return {"title": "New Chat"}
 
         messages = state.values.get("messages", [])
-        print("MESSAGES:", messages)
 
         user_text = " ".join(
             m.content for m in messages
@@ -155,18 +152,22 @@ def get_thread_title(thread_id: str):
             f"Conversation: {user_text}"
         )
 
+        print("Calling headingbot...")
         name = headingbot.invoke(prompt)
+        print("headingbot returned:", name)
+        print("type:", type(name))
 
-        print("NAME TYPE:", type(name))
-        print("NAME:", name)
+        return {
+            "title": name.heading
+        }
 
-        return {"title": name.heading}
-
-    except Exception:
+    except Exception as e:
         import traceback
         traceback.print_exc()
-        raise
-
+        return {
+            "title": "New Chat",
+            "error": str(e)
+        }
 
 @app.get("/thread/{thread_id}")
 def get_thread(thread_id: str):
