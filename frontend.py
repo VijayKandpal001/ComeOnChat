@@ -167,7 +167,7 @@ if user_input:
             ) as response:
 
                 for chunk in response.iter_content(decode_unicode=True):
-                    if chunk:
+                    if chunk and chunk != "\n":
                         yield chunk
         # def ai_only_stream():
         #     response = requests.post(

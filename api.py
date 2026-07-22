@@ -43,19 +43,45 @@ def chat(req: ChatRequest):
 @app.post("/chat/stream")
 def chat_stream(req: ChatRequest):
 
+    import threading, queue
+
     def event_generator():
         try:
+            q = queue.Queue()
+
+            def stream_to_queue():
+                try:
+                    for msg, metadata in bot.stream(
+                        {"messages": [HumanMessage(content=req.message)]},
+                        config={"configurable": {"thread_id": req.thread_id}},
+                        stream_mode="messages",
+                    ):
+                        q.put(("msg", msg, metadata))
+                    q.put(("done", None, None))
+                except Exception as e:
+                    q.put(("error", e, None))
+
+            t = threading.Thread(target=stream_to_queue, daemon=True)
+            t.start()
+
             yielded = False
-            for msg, metadata in bot.stream(
-                {"messages": [HumanMessage(content=req.message)]},
-                config={"configurable": {"thread_id": req.thread_id}},
-                stream_mode="messages",
-            ):
-                if metadata.get("langgraph_node") == "chat_node":
-                    if isinstance(msg, (AIMessageChunk, AIMessage)):
-                        if msg.content:
-                            yielded = True
-                            yield msg.content
+            while True:
+                try:
+                    item = q.get(timeout=20)
+                    if item[0] == "done":
+                        break
+                    elif item[0] == "error":
+                        raise item[1]
+                    elif item[0] == "msg":
+                        msg, metadata = item[1], item[2]
+                        if metadata.get("langgraph_node") == "chat_node":
+                            if isinstance(msg, (AIMessageChunk, AIMessage)):
+                                if msg.content:
+                                    yielded = True
+                                    yield msg.content
+                except queue.Empty:
+                    yield "\n"
+
             if not yielded:
                 result = bot.invoke(
                     {"messages": [HumanMessage(content=req.message)]},
